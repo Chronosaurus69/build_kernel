@@ -38,8 +38,7 @@ jobs:
       - name: Clone Kernel Source
         run: |
           # Ganti URL di bawah dengan repositori kernel source Oppo A16 Anda
-          git clone --depth=1 https://github.com/Chronosaurus69/android_kernel_oppo_mt6765.git -b android-11 $GITHUB_WORKSPACE/kernel
-          git clone --depth=1 https://github.com/Chronosaurus69/android_kernel_modules_oppo_mt6765.git -b android-11 $GITHUB_WORKSPACE/kernel
+          git clone --depth=1 https://github.com/Chronosaurus69/android_kernel_oppo_mt6765.git -b android-11 $GITHUB_WORKSPACE/kernel 
 
       - name: Build Kernel
         run: |
