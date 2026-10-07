@@ -1,0 +1,90 @@
+name: Build Oppo A16 Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Compile Kernel
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git ccache bc libssl-dev libncurses5-dev libncursesw5-dev \
+            bison flex libelf-dev build-essential zip curl wget cpio \
+            python3 python-is-python3 libtinfo5
+
+      - name: Setup Clang and Toolchain
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/toolchain
+          cd $GITHUB_WORKSPACE/toolchain
+          
+          # Download AOSP Clang (r383902 / Clang 11 / Clang 12 cocok untuk MT6765 Android 11)
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android11-release/clang-r383902.tar.gz
+          mkdir clang && tar -xf clang-r383902.tar.gz -C clang
+          
+          # Download GCC AArch64 Cross-Compiler
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 gcc64
+          
+          # Download GCC ARM32 Cross-Compiler
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 gcc32
+
+      - name: Clone Kernel Source
+        run: |
+          # Ganti URL di bawah dengan repositori kernel source Oppo A16 Anda
+          git clone --depth=1 https://github.com/Chronosaurus69/android_kernel_oppo_mt6765.git -b android-11 $GITHUB_WORKSPACE/kernel
+          git clone --depth=1 https://github.com/Chronosaurus69/android_kernel_modules_oppo_mt6765.git -b android-11 $GITHUB_WORKSPACE/kernel
+
+      - name: Build Kernel
+        run: |
+          cd $GITHUB_WORKSPACE/kernel
+          
+          # Path Environment Variables
+          export PATH=$GITHUB_WORKSPACE/toolchain/clang/bin:$GITHUB_WORKSPACE/toolchain/gcc64/bin:$GITHUB_WORKSPACE/toolchain/gcc32/bin:$PATH
+          export ARCH=arm64
+          export SUBARCH=arm64
+          
+          # Defconfig untuk chipset MT6765 / Oppo A16
+          # Sesuaikan nama defconfig sesuai file di arch/arm64/configs/
+          DEFCONFIG="CPH2269_defconfig"
+          
+          make O=out $DEFCONFIG
+          
+          make -j$(nproc --all) O=out \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-android- \
+            CROSS_COMPILE_ARM32=arm-linux-androideabi-
+
+      - name: Package with AnyKernel3
+        run: |
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git $GITHUB_WORKSPACE/AnyKernel3
+          cd $GITHUB_WORKSPACE/AnyKernel3
+          
+          # Sesuaikan konfigurasi AnyKernel3 untuk Oppo A16
+          sed -i 's/device.name1=.*/device.name1=OPPO A16/' anykernel.sh
+          sed -i 's/device.name2=.*/device.name2=CPH2269/' anykernel.sh
+          
+          # Salin hasil kompilasi Kernel (Image.gz atau Image.gz-dtb)
+          if [ -f $GITHUB_WORKSPACE/kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
+            cp $GITHUB_WORKSPACE/kernel/out/arch/arm64/boot/Image.gz-dtb .
+          elif [ -f $GITHUB_WORKSPACE/kernel/out/arch/arm64/boot/Image.gz ]; then
+            cp $GITHUB_WORKSPACE/kernel/out/arch/arm64/boot/Image.gz .
+          else
+            cp $GITHUB_WORKSPACE/kernel/out/arch/arm64/boot/Image .
+          fi
+          
+          zip -r9   ElysianMedia-CHP2269.zip * -x .git README.md
+
+      - name: Upload Kernel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElysianMedia-CHP2269-zip
+          path: $GITHUB_WORKSPACE/AnyKernel3/ElysianMedia-CHP2269.zip
+
