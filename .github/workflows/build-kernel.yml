@@ -1,4 +1,4 @@
-name: Build Oppo A16 Kernel
+name: Build Kernel - CPH2269
 
 on:
   workflow_dispatch:
